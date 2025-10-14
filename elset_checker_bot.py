@@ -12,7 +12,7 @@ from telegram import Bot
 # === НАСТРОЙКИ ===
 TELEGRAM_TOKEN = os.getenv(TELEGRAM_TOKEN)
 CHAT_IDS = [int(x) for x in os.getenv(CHAT_IDS, ).split(,) if x.strip()]
-TARGET_PLACES = [глазов, завьялово, молдаванка]
+TARGET_PLACES = [завьялово, молдаванка]
 
 PAGE_URL = httpselsetudm.ruconsumersplanovye-otklyucheniya-elektroenergii
 CHECKED_FILE = checked_files.json
@@ -105,7 +105,7 @@ def main()
                 for match in matches
                     append_history(datetime.now().strftime(%Y-%m-%d %H%M), place, match, pdf_url)
 
-                print(f✅ Сообщение и запись в историю по '{place}' добавлены.)
+                print(f Сообщение и запись в историю по '{place}' добавлены.)
         else
             print(f'{pdf_url}' — нет совпадений.)
 
@@ -119,4 +119,3 @@ def main()
 
 if __name__ == __main__
     main()
-
