@@ -107,7 +107,7 @@ def main()
 
                 print(f Сообщение и запись в историю по '{place}' добавлены.)
         else
-            print(f'{pdf_url}' — нет совпадений.)
+            print(f'{pdf_url}' нет совпадений.)
 
         checked_urls.append(pdf_url)
 
@@ -119,4 +119,5 @@ def main()
 
 if __name__ == __main__
     main()
+
 
