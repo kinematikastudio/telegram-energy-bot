@@ -73,7 +73,7 @@ def main()
 
     for pdf_url in pdf_urls
         if pdf_url in checked_urls
-            print(fПропускаем уже обработанный файл {pdf_url})
+            print(f Пропускаем уже обработанный файл {pdf_url})
             continue
 
         print(fПроверяем новый файл {pdf_url})
