@@ -12,7 +12,7 @@ from telegram import Bot
 # === НАСТРОЙКИ ===
 TELEGRAM_TOKEN = os.getenv(TELEGRAM_TOKEN)
 CHAT_IDS = [int(x) for x in os.getenv(CHAT_IDS, ).split(,) if x.strip()]
-TARGET_PLACES = [завьялово, молдаванка]
+TARGET_PLACES = [глазов, завьялово, молдаванка]
 
 PAGE_URL = httpselsetudm.ruconsumersplanovye-otklyucheniya-elektroenergii
 CHECKED_FILE = checked_files.json
@@ -92,7 +92,7 @@ def main()
             new_files_found = True
             for place, matches in found_places
                 message = (
-                    f⚡ Найдено упоминание '{place.title()}' в новом файле отключений 
+                    f Найдено упоминание '{place.title()}' в новом файле отключений 
                     f({datetime.now()%d.%m.%Y})nn
                     + n.join(matches[10])
                     + fnn📄 {pdf_url}
@@ -119,3 +119,4 @@ def main()
 
 if __name__ == __main__
     main()
+
