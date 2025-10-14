@@ -95,7 +95,7 @@ def main()
                     f Найдено упоминание '{place.title()}' в новом файле отключений 
                     f({datetime.now()%d.%m.%Y})nn
                     + n.join(matches[10])
-                    + fnn📄 {pdf_url}
+                    + fnn {pdf_url}
                 )
 
                 for chat_id in CHAT_IDS
@@ -119,3 +119,4 @@ def main()
 
 if __name__ == __main__
     main()
+
