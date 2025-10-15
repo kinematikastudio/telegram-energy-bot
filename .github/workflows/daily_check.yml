@@ -37,7 +37,7 @@ jobs:
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: python telegram-energy-bot.py
+      run: python elset_checker_bot.py
       
     - name: Save cache
       uses: actions/cache@v3
