@@ -3,8 +3,25 @@ import pdfplumber
 import io
 import re
 import os
+import datetime
 from urllib.parse import urljoin
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TARGET_CITIES, MESSAGE_SETTINGS, DEBUG, HISTORY_FILE
+
+
+LOG_FILE = "bot_launches.log"
+
+def log_launch():
+    """Запись лога запуска в файл"""
+    try:
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_message = f"[{current_time}] Бот запущен\n"
+        
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_message)
+        
+        print(f"Лог запуска записан: {current_time}")
+    except Exception as e:
+        print(f"Ошибка записи лога: {e}")
 
 def send_telegram_message(message):
     """Отправка сообщения в Telegram"""
@@ -223,6 +240,8 @@ def process_pdf_file(pdf_url):
         return False
 
 def main():
+    # Логируем запуск
+    log_launch()
     try:
         print("Начинаем обработку...")
         print(f"Ищем отключения для населенных пунктов: {', '.join(TARGET_CITIES)}")
