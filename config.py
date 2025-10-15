@@ -22,11 +22,9 @@ MESSAGE_SETTINGS = {
     'separator': '─' * 40,  # Разделитель между записями
 }
 
-# Используем директорию для временных файлов GitHub Actions
-WORKSPACE = os.getenv('GITHUB_WORKSPACE', '.')
-DATA_DIR = os.path.join(WORKSPACE, 'data')
+# Всегда используем файловое хранилище с папкой data
+DATA_DIR = 'data'
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Файлы в специальной директории
 HISTORY_FILE = os.path.join(DATA_DIR, "processed_pdfs.txt")
 LOG_FILE = os.path.join(DATA_DIR, "bot_launches.log")

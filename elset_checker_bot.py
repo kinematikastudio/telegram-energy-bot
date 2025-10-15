@@ -5,23 +5,7 @@ import re
 import os
 import datetime
 from urllib.parse import urljoin
-from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TARGET_CITIES, MESSAGE_SETTINGS, DEBUG, HISTORY_FILE
-
-
-LOG_FILE = "bot_launches.log"
-
-def log_launch():
-    """Запись лога запуска в файл"""
-    try:
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_message = f"[{current_time}] Бот запущен\n"
-        
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(log_message)
-        
-        print(f"Лог запуска записан: {current_time}")
-    except Exception as e:
-        print(f"Ошибка записи лога: {e}")
+from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TARGET_CITIES, MESSAGE_SETTINGS, DEBUG, HISTORY_FILE, LOG_FILE, DATA_DIR
 
 def send_telegram_message(message):
     """Отправка сообщения в Telegram"""
@@ -58,6 +42,21 @@ def mark_pdf_processed(pdf_url):
         print(f"Файл {pdf_url} добавлен в историю")
     except Exception as e:
         print(f"Ошибка записи в файл истории: {e}")
+
+def log_launch():
+    """Запись лога запуска"""
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_message = f"[{current_time}] Бот запущен"
+    
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_message + "\n")
+        print(f"Лог запуска записан: {current_time}")
+    except Exception as e:
+        print(f"Ошибка записи лога: {e}")
+    
+    # Всегда выводим в консоль
+    print(f"Лог: {log_message}")
 
 def format_outage_message(entry):
     """Форматирование одной записи об отключении"""
@@ -242,6 +241,7 @@ def process_pdf_file(pdf_url):
 def main():
     # Логируем запуск
     log_launch()
+    
     try:
         print("Начинаем обработку...")
         print(f"Ищем отключения для населенных пунктов: {', '.join(TARGET_CITIES)}")
