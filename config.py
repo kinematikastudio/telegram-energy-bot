@@ -22,13 +22,11 @@ MESSAGE_SETTINGS = {
     'separator': '─' * 40,  # Разделитель между записями
 }
 
-# В GitHub Actions не используем файлы для хранения состояния
-USE_FILE_STORAGE = os.getenv('GITHUB_ACTIONS') is None
+# Используем директорию для временных файлов GitHub Actions
+WORKSPACE = os.getenv('GITHUB_WORKSPACE', '.')
+DATA_DIR = os.path.join(WORKSPACE, 'data')
+os.makedirs(DATA_DIR, exist_ok=True)
 
-# Файлы только для локального использования
-if USE_FILE_STORAGE:
-    HISTORY_FILE = "processed_pdfs.txt"
-    LOG_FILE = "bot_launches.log"
-else:
-    HISTORY_FILE = None
-    LOG_FILE = None
+# Файлы в специальной директории
+HISTORY_FILE = os.path.join(DATA_DIR, "processed_pdfs.txt")
+LOG_FILE = os.path.join(DATA_DIR, "bot_launches.log")

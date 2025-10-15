@@ -5,7 +5,23 @@ import re
 import os
 import datetime
 from urllib.parse import urljoin
-from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TARGET_CITIES, MESSAGE_SETTINGS, DEBUG, HISTORY_FILE, LOG_FILE, USE_FILE_STORAGE
+from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TARGET_CITIES, MESSAGE_SETTINGS, DEBUG, HISTORY_FILE
+
+
+LOG_FILE = "bot_launches.log"
+
+def log_launch():
+    """Запись лога запуска в файл"""
+    try:
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_message = f"[{current_time}] Бот запущен\n"
+        
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_message)
+        
+        print(f"Лог запуска записан: {current_time}")
+    except Exception as e:
+        print(f"Ошибка записи лога: {e}")
 
 def send_telegram_message(message):
     """Отправка сообщения в Telegram"""
@@ -23,7 +39,7 @@ def send_telegram_message(message):
 
 def is_pdf_processed(pdf_url):
     """Проверяем, обрабатывался ли уже этот PDF файл"""
-    if not USE_FILE_STORAGE or not HISTORY_FILE or not os.path.exists(HISTORY_FILE):
+    if not os.path.exists(HISTORY_FILE):
         return False
     
     try:
@@ -36,33 +52,12 @@ def is_pdf_processed(pdf_url):
 
 def mark_pdf_processed(pdf_url):
     """Добавляем PDF файл в список обработанных"""
-    if not USE_FILE_STORAGE or not HISTORY_FILE:
-        print(f"Файл {pdf_url} обработан (файловое хранилище отключено)")
-        return
-        
     try:
         with open(HISTORY_FILE, 'a', encoding='utf-8') as f:
             f.write(pdf_url + '\n')
         print(f"Файл {pdf_url} добавлен в историю")
     except Exception as e:
         print(f"Ошибка записи в файл истории: {e}")
-
-def log_launch():
-    """Запись лога запуска"""
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_message = f"[{current_time}] Бот запущен"
-    
-    if USE_FILE_STORAGE and LOG_FILE:
-        try:
-            with open(LOG_FILE, "a", encoding="utf-8") as f:
-                f.write(log_message + "\n")
-            print(f"Лог запуска записан: {current_time}")
-            return
-        except Exception as e:
-            print(f"Ошибка записи лога: {e}")
-    
-    # Всегда выводим в консоль
-    print(f"Лог: {log_message}")
 
 def format_outage_message(entry):
     """Форматирование одной записи об отключении"""
@@ -247,7 +242,6 @@ def process_pdf_file(pdf_url):
 def main():
     # Логируем запуск
     log_launch()
-    
     try:
         print("Начинаем обработку...")
         print(f"Ищем отключения для населенных пунктов: {', '.join(TARGET_CITIES)}")
