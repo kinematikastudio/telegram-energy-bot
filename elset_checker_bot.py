@@ -1,123 +1,270 @@
-import os
 import requests
-from bs4 import BeautifulSoup
 import pdfplumber
 import io
 import re
-import json
-import csv
-from datetime import datetime
-from telegram import Bot
+import os
+from urllib.parse import urljoin
+from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TARGET_CITIES, MESSAGE_SETTINGS, DEBUG, HISTORY_FILE
 
-# === НАСТРОЙКИ ===
-TELEGRAM_TOKEN = os.getenv(TELEGRAM_TOKEN)
-CHAT_IDS = [int(x) for x in os.getenv(CHAT_IDS, ).split(,) if x.strip()]
-TARGET_PLACES = [глазов, завьялово, молдаванка]
+def send_telegram_message(message):
+    """Отправка сообщения в Telegram"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        'chat_id': TELEGRAM_CHAT_ID,
+        'text': message,
+        'parse_mode': 'HTML'
+    }
+    try:
+        response = requests.post(url, data=payload)
+        return response.json()
+    except Exception as e:
+        print(f"Ошибка отправки в Telegram: {e}")
 
-PAGE_URL = httpselsetudm.ruconsumersplanovye-otklyucheniya-elektroenergii
-CHECKED_FILE = checked_files.json
-HISTORY_FILE = history.csv
+def is_pdf_processed(pdf_url):
+    """Проверяем, обрабатывался ли уже этот PDF файл"""
+    if not os.path.exists(HISTORY_FILE):
+        return False
+    
+    try:
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            processed_files = f.read().splitlines()
+        return pdf_url in processed_files
+    except Exception as e:
+        print(f"Ошибка чтения файла истории: {e}")
+        return False
 
-bot = Bot(token=TELEGRAM_TOKEN)
+def mark_pdf_processed(pdf_url):
+    """Добавляем PDF файл в список обработанных"""
+    try:
+        with open(HISTORY_FILE, 'a', encoding='utf-8') as f:
+            f.write(pdf_url + '\n')
+        print(f"Файл {pdf_url} добавлен в историю")
+    except Exception as e:
+        print(f"Ошибка записи в файл истории: {e}")
 
+def format_outage_message(entry):
+    """Форматирование одной записи об отключении"""
+    city = entry.get('city', 'Не указан')
+    date_off = entry.get('date_off', 'Не указана')
+    time_off = entry.get('time_off', 'Не указано')
+    time_on = entry.get('time_on', 'Не указано')
+    streets = entry.get('streets', 'Улицы не указаны')
+    
+    if MESSAGE_SETTINGS['use_emoji']:
+        message = (
+            f"{city}\n"
+            f"<b>📅 Дата:</b> {date_off}\n"
+            f"<b>⏰ Время:</b> {time_off}-{time_on}\n"
+            f"\n"
+            f"🏙️ {streets}"
+        )
+    else:
+        message = (
+            f"{city}\n"
+            f"<b>Дата:</b> {date_off}\n"
+            f"<b>Время:</b> {time_off}-{time_on}\n"
+            f"\n"
+            f"{streets}"
+        )
+    
+    return message
 
-def load_checked()
-    if not os.path.exists(CHECKED_FILE)
+def create_telegram_message(results, pdf_url, is_debug=False, is_duplicate=False):
+    """Создание форматированного сообщения для Telegram"""
+    if not results:
         return []
-    try
-        with open(CHECKED_FILE, r, encoding=utf-8) as f
-            return json.load(f)
-    except Exception
-        return []
 
+    separator = MESSAGE_SETTINGS['separator']
+    
+    if MESSAGE_SETTINGS['use_emoji']:
+        header = f"⚡ <b>График отключений электроэнергии</b> ⚡\n"
+        header += f"🏘️ <b>Искомые населенные пункты:</b> {', '.join(TARGET_CITIES)}\n"
+        header += f"📊 <b>Найдено записей:</b> {len(results)}\n"
+        header += f"🔗 <a href='{pdf_url}'>Ссылка на файл</a>\n"
+        if is_duplicate:
+            header += f"🔄 <b>Повторная обработка</b> (файл уже был обработан)\n"
+        if is_debug:
+            header += f"🔧 <b>ОТЛАДОЧНЫЙ РЕЖИМ</b>\n"
+        header += f"\n{separator}\n\n"
+    else:
+        header = f"<b>График отключений электроэнергии</b>\n"
+        header += f"<b>Искомые населенные пункты:</b> {', '.join(TARGET_CITIES)}\n"
+        header += f"<b>Найдено записей:</b> {len(results)}\n"
+        header += f"<a href='{pdf_url}'>Ссылка на файл</a>\n"
+        if is_duplicate:
+            header += f"<b>Повторная обработка</b> (файл уже был обработан)\n"
+        if is_debug:
+            header += f"<b>ОТЛАДОЧНЫЙ РЕЖИМ</b>\n"
+        header += f"\n{separator}\n\n"
+    
+    messages = []
+    current_message = header
+    
+    for i, entry in enumerate(results, 1):
+        entry_text = format_outage_message(entry)
+        
+        # Если добавляем разделитель (кроме последней записи)
+        if i < len(results):
+            entry_text += f"\n{separator}\n\n"
+        
+        # Проверяем, не превысит ли сообщение лимит Telegram (4096 символов)
+        if len(current_message + entry_text) > 4000:
+            messages.append(current_message)
+            current_message = entry_text
+        else:
+            current_message += entry_text
+    
+    if current_message:
+        messages.append(current_message)
+    
+    return messages
 
-def save_checked(urls)
-    with open(CHECKED_FILE, w, encoding=utf-8) as f
-        json.dump(urls, f, ensure_ascii=False, indent=2)
+def parse_pdf_content(pdf_content):
+    """Парсинг содержимого PDF и поиск нужных строк"""
+    results = []
+    
+    with pdfplumber.open(io.BytesIO(pdf_content)) as pdf:
+        for page in pdf.pages:
+            # Пытаемся извлечь таблицу
+            tables = page.extract_tables()
+            
+            for table in tables:
+                if table:
+                    for row in table:
+                        # Пропускаем пустые строки и заголовки
+                        if not row or not row[0] or not str(row[0]).strip().isdigit():
+                            continue
+                            
+                        # Проверяем наличие нужных городов во втором столбце
+                        if len(row) > 1 and row[1]:
+                            city_name = str(row[1]).strip()
+                            # Проверяем, содержится ли любой из искомых городов в названии
+                            for target_city in TARGET_CITIES:
+                                if target_city in city_name:
+                                    # Извлекаем данные из столбцов
+                                    try:
+                                        city = str(row[1]).strip() if row[1] else city_name
+                                        streets = str(row[2]).strip() if row[2] and len(row) > 2 else "улицы не указаны"
+                                        date_off = str(row[3]).strip() if row[3] and len(row) > 3 else "дата не указана"
+                                        time_off = str(row[4]).strip() if row[4] and len(row) > 4 else "время не указано"
+                                        time_on = str(row[6]).strip() if row[6] and len(row) > 6 else "время не указано"
+                                        
+                                        # Форматируем результат в виде словаря
+                                        result = {
+                                            'city': city,
+                                            'date_off': date_off,
+                                            'time_off': time_off,
+                                            'time_on': time_on,
+                                            'streets': streets
+                                        }
+                                        results.append(result)
+                                        print(f"Найдена запись: {city}, {date_off}, {time_off}-{time_on}, {streets}")
+                                        break  # Прерываем после первого совпадения
+                                        
+                                    except Exception as e:
+                                        print(f"Ошибка обработки строки: {e}")
+                                        continue
+    
+    return results
 
+def process_pdf_file(pdf_url):
+    """Обработка одного PDF файла"""
+    try:
+        print(f"Обрабатываем PDF: {pdf_url}")
+        
+        # Проверяем, обрабатывался ли уже этот файл
+        is_duplicate = is_pdf_processed(pdf_url)
+        
+        # Если файл уже обрабатывался и не в режиме отладки - пропускаем
+        if is_duplicate and not DEBUG:
+            print(f"Файл {pdf_url} уже был обработан ранее. Пропускаем.")
+            return True
+        
+        # Загрузка PDF
+        pdf_response = requests.get(pdf_url, timeout=30)
+        pdf_response.raise_for_status()
 
-def append_history(date, place, match_text, pdf_url)
-    Добавляет запись в историю.
-    file_exists = os.path.exists(HISTORY_FILE)
-    with open(HISTORY_FILE, a, encoding=utf-8, newline=) as f
-        writer = csv.writer(f, delimiter=;)
-        if not file_exists
-            writer.writerow([date, place, text, pdf_url])
-        writer.writerow([date, place, match_text, pdf_url])
+        # Парсинг PDF
+        results = parse_pdf_content(pdf_response.content)
 
+        # Отправка результатов в Telegram только если есть записи
+        if results:
+            # Создаем форматированные сообщения
+            messages = create_telegram_message(results, pdf_url, is_debug=DEBUG, is_duplicate=is_duplicate)
+            
+            for message in messages:
+                send_telegram_message(message)
+            print(f"Отправлено {len(messages)} сообщений в Telegram для файла {pdf_url}")
+            
+            # Помечаем файл как обработанный (только если не дубликат в режиме отладки)
+            if not is_duplicate:
+                mark_pdf_processed(pdf_url)
+        else:
+            # Если записей не найдено, выводим только в консоль
+            print(f"Для населенных пунктов {TARGET_CITIES} отключений не найдено в файле {pdf_url}")
+            
+            # Помечаем файл как обработанный (только если не дубликат в режиме отладки)
+            if not is_duplicate:
+                mark_pdf_processed(pdf_url)
+                
+        return True
+        
+    except requests.RequestException as e:
+        error_msg = f"❌ Ошибка сети при обработке {pdf_url}: {str(e)}"
+        print(error_msg)
+        if DEBUG:
+            send_telegram_message(error_msg + "\n🔧 <b>ОТЛАДОЧНЫЙ РЕЖИМ</b>")
+        return False
+    except Exception as e:
+        error_msg = f"❌ Ошибка при обработке {pdf_url}: {str(e)}"
+        print(error_msg)
+        if DEBUG:
+            send_telegram_message(error_msg + "\n🔧 <b>ОТЛАДОЧНЫЙ РЕЖИМ</b>")
+        return False
 
-def get_all_pdf_urls()
-    r = requests.get(PAGE_URL, timeout=20)
-    soup = BeautifulSoup(r.text, html.parser)
-    links = soup.find_all(a, href=re.compile(r.pdf$))
-    pdf_urls = []
-    for link in links
-        href = link[href]
-        if href.startswith(http)
-            pdf_urls.append(href)
-        else
-            pdf_urls.append(httpselsetudm.ru + href)
-    return list(set(pdf_urls))
+def main():
+    try:
+        print("Начинаем обработку...")
+        print(f"Ищем отключения для населенных пунктов: {', '.join(TARGET_CITIES)}")
+        
+        # Загрузка страницы
+        url = "https://elsetudm.ru/consumers/planovye-otklyucheniya-elektroenergii/"
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
 
+        # Поиск всех PDF ссылок в HTML
+        pdf_links = re.findall(r'href="([^"]*\.pdf[^"]*)"', response.text, re.IGNORECASE)
+        if not pdf_links:
+            print("PDF файлы не найдены на странице")
+            return
 
-def get_text_from_pdf(pdf_content)
-    with pdfplumber.open(io.BytesIO(pdf_content)) as pdf
-        text = n.join(page.extract_text() or  for page in pdf.pages)
-    return text.lower()
+        print(f"Найдено {len(pdf_links)} PDF файлов на странице")
+        
+        # Обрабатываем каждый PDF файл
+        processed_count = 0
+        for pdf_link in pdf_links:
+            # Формируем полный URL
+            if not pdf_link.startswith('http'):
+                pdf_url = urljoin(url, pdf_link)
+            else:
+                pdf_url = pdf_link
+                
+            # Обрабатываем файл
+            if process_pdf_file(pdf_url):
+                processed_count += 1
+        
+        print(f"Обработка завершена. Успешно обработано {processed_count} из {len(pdf_links)} файлов")
+        
+        # Если в отладочном режиме все файлы уже были обработаны, выводим только в консоль
+        if DEBUG and processed_count == 0 and len(pdf_links) > 0:
+            print("Все файлы уже были обработаны ранее (отладочный режим)")
 
+    except requests.RequestException as e:
+        error_msg = f"❌ Ошибка сети при загрузке страницы: {str(e)}"
+        print(error_msg)
+    except Exception as e:
+        error_msg = f"❌ Произошла ошибка: {str(e)}"
+        print(error_msg)
 
-def main()
-    checked_urls = load_checked()
-    pdf_urls = get_all_pdf_urls()
-    new_files_found = False
-
-    for pdf_url in pdf_urls
-        if pdf_url in checked_urls
-            print(f Пропускаем уже обработанный файл {pdf_url})
-            continue
-
-        print(fПроверяем новый файл {pdf_url})
-        response = requests.get(pdf_url)
-        pdf_content = response.content
-        text = get_text_from_pdf(pdf_content)
-        lines = text.splitlines()
-        found_places = []
-
-        for place in TARGET_PLACES
-            matches = [line.strip() for line in lines if place in line]
-            if matches
-                found_places.append((place, matches))
-
-        if found_places
-            new_files_found = True
-            for place, matches in found_places
-                message = (
-                    f Найдено упоминание '{place.title()}' в новом файле отключений 
-                    f({datetime.now()%d.%m.%Y})nn
-                    + n.join(matches[10])
-                    + fnn {pdf_url}
-                )
-
-                for chat_id in CHAT_IDS
-                    bot.send_message(chat_id=chat_id, text=message)
-                    bot.send_document(chat_id=chat_id, document=io.BytesIO(pdf_content), filename=otklyucheniya.pdf)
-
-                for match in matches
-                    append_history(datetime.now().strftime(%Y-%m-%d %H%M), place, match, pdf_url)
-
-                print(f Сообщение и запись в историю по '{place}' добавлены.)
-        else
-            print(f'{pdf_url}' нет совпадений.)
-
-        checked_urls.append(pdf_url)
-
-    save_checked(checked_urls)
-
-    if not new_files_found
-        print(Новых отключений для заданных населённых пунктов не найдено.)
-
-
-if __name__ == __main__
+if __name__ == "__main__":
     main()
-
-
