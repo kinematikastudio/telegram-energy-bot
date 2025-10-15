@@ -6,22 +6,41 @@ on:
   workflow_dispatch:  # чтобы можно было запустить вручную
 
 jobs:
-  check:
+  run-bot:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run script
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_IDS: ${{ secrets.CHAT_IDS }}
-        run: python elset_checker_bot.py
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        pip install requests pdfplumber
+        
+    - name: Create data directory
+      run: mkdir -p data
+      
+    - name: Restore cache
+      uses: actions/cache@v3
+      with:
+        path: data
+        key: ${{ runner.os }}-data-${{ hashFiles('data/processed_pdfs.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-data-
+          
+    - name: Run bot
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: python bot.py
+      
+    - name: Save cache
+      uses: actions/cache@v3
+      with:
+        path: data
+        key: ${{ runner.os }}-data-${{ hashFiles('data/processed_pdfs.txt') }}
