@@ -1,9 +1,9 @@
-name: Daily energy check
+name: Run Telegram Bot
 
 on:
   schedule:
-    - cron: "0 5,8,13 * * *"  # каждый день в 07:00 утра по UTC (~10:00 по Мск)
-  workflow_dispatch:  # чтобы можно было запустить вручную
+    - cron: '0 8 * * *'  # Каждый день в 8:00
+  workflow_dispatch:      # Разрешить ручной запуск
 
 jobs:
   run-bot:
@@ -22,25 +22,15 @@ jobs:
       run: |
         pip install requests pdfplumber
         
-    - name: Create data directory
-      run: mkdir -p data
-      
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: data
-        key: ${{ runner.os }}-data-${{ hashFiles('data/processed_pdfs.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-data-
-          
     - name: Run bot
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: python elset_checker_bot.py
+      run: python telegram-energy-bot.py
       
-    - name: Save cache
-      uses: actions/cache@v3
+    - name: Upload processed files list as artifact
+      uses: actions/upload-artifact@v4
       with:
-        path: data
-        key: ${{ runner.os }}-data-${{ hashFiles('data/processed_pdfs.txt') }}
+        name: processed-pdfs
+        path: data/
+        retention-days: 30
