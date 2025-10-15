@@ -5,7 +5,9 @@
 TELEGRAM_BOT_TOKEN = "8071837552:AAFE3OIukWMIj0CGZLtBftR2XwEVJp6Fm2I"
 
 # ID чата/канала (можно получить через @userinfobot)
-TELEGRAM_CHAT_ID = "-1002438113981"
+#TELEGRAM_CHAT_ID = "-1002438113981"
+TELEGRAM_CHAT_ID = "-4927608858"
+
 
 # Населенный пункт для поиска (например: "с. Заречное", "д. Лесная")
 #TARGET_CITY = "Кез, Балезино"
@@ -22,4 +24,5 @@ MESSAGE_SETTINGS = {
 }
 
 # Файл для хранения истории обработанных PDF
+
 HISTORY_FILE = "processed_pdfs.txt"
